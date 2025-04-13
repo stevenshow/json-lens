@@ -1,0 +1,32 @@
+{
+  "user": {
+    "id": 42,
+    "name": "Steven Schoebinger",
+    "email": "steven@example.com",
+    "roles": ["admin", "developer"],
+    "profile": {
+      "location": "Utah",
+      "timezone": "America/Denver",
+      "verified": true
+    }
+  },
+  "projects": [
+    {
+      "id": "proj_1",
+      "name": "JSON Lens",
+      "lastUpdated": "2025-04-12T17:32:00Z"
+    },
+    {
+      "id": "proj_2",
+      "name": "Budget Tracker",
+      "lastUpdated": "2025-03-10T11:15:00Z"
+    }
+  ],
+  "settings": {
+    "darkMode": true,
+    "notifications": {
+      "email": false,
+      "push": true
+    }
+  }
+}
