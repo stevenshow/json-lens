@@ -3,14 +3,48 @@ import "./App.css";
 // Use the plugin imports for Tauri v2
 import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile } from "@tauri-apps/plugin-fs";
+// Import dnd-kit components
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+// Define a Tab type for our tabs
+type JsonTab = {
+  id: string;
+  name: string;
+  jsonInput: string;
+  parsedJson: Record<string, unknown> | unknown[] | null;
+  isEditing: boolean;
+  searchTerm: string;
+};
 
 // CollapsibleJSON component for rendering expandable JSON objects
 const CollapsibleJSON = ({
   data,
   searchTerm,
+  onSwitchToEdit,
+  onToggleSearch,
+  showSearchBar,
 }: {
   data: Record<string, unknown> | unknown[];
   searchTerm: string;
+  onSwitchToEdit: () => void;
+  onToggleSearch: () => void;
+  showSearchBar: boolean;
 }) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [matchCount, setMatchCount] = useState<number>(0);
@@ -20,7 +54,7 @@ const CollapsibleJSON = ({
   const matchRefs = useRef<Map<string, HTMLElement>>(new Map());
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Function to reset match navigation when search term changes
+  // Effect to reset match navigation when search term changes
   useEffect(() => {
     setCurrentMatchIndex(0);
     matchRefs.current = new Map();
@@ -640,7 +674,12 @@ const CollapsibleJSON = ({
   return (
     <div ref={containerRef}>
       <div
-        style={{ marginBottom: "8px", display: "flex", alignItems: "center" }}
+        style={{
+          marginBottom: "8px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
       >
         <div>
           <button onClick={collapseAll} className="collapse-button">
@@ -654,30 +693,49 @@ const CollapsibleJSON = ({
             Expand All
           </button>
         </div>
-        {searchTerm.trim() !== "" && (
-          <div className="match-navigation">
-            <button
-              className="nav-button prev-match"
-              onClick={goToPrevMatch}
-              disabled={matchCount === 0}
-              title="Previous match"
-            >
-              ↑
-            </button>
-            <span className="match-count">
-              {matchCount > 0 ? `${currentMatchIndex + 1}/${matchCount}` : "0"}{" "}
-              matches
-            </span>
-            <button
-              className="nav-button next-match"
-              onClick={goToNextMatch}
-              disabled={matchCount === 0}
-              title="Next match"
-            >
-              ↓
-            </button>
-          </div>
-        )}
+
+        <div style={{ display: "flex", alignItems: "center" }}>
+          {searchTerm.trim() !== "" && (
+            <div className="match-navigation">
+              <button
+                className="nav-button prev-match"
+                onClick={goToPrevMatch}
+                disabled={matchCount === 0}
+                title="Previous match"
+              >
+                ↑
+              </button>
+              <span className="match-count">
+                {matchCount > 0
+                  ? `${currentMatchIndex + 1}/${matchCount}`
+                  : "0"}{" "}
+                matches
+              </span>
+              <button
+                className="nav-button next-match"
+                onClick={goToNextMatch}
+                disabled={matchCount === 0}
+                title="Next match"
+              >
+                ↓
+              </button>
+            </div>
+          )}
+          <button
+            onClick={onSwitchToEdit}
+            className="edit-button"
+            style={{ marginLeft: "8px" }}
+          >
+            Edit
+          </button>
+          <button
+            onClick={onToggleSearch}
+            className="search-button"
+            style={{ marginLeft: "8px" }}
+          >
+            {showSearchBar ? "Hide Search" : "Search"}
+          </button>
+        </div>
       </div>
       <div className="collapsible-json">{renderValue(data, "root")}</div>
       <div
@@ -691,16 +749,243 @@ const CollapsibleJSON = ({
   );
 };
 
-function App() {
-  const [parsedJson, setParsedJson] = useState<
-    Record<string, unknown> | unknown[] | null
-  >(null);
-  const [error, setError] = useState<string>("");
-  const [jsonInput, setJsonInput] = useState<string>("");
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [showInputView, setShowInputView] = useState<boolean>(true);
+// SortableTab component for draggable tabs
+const SortableTab = ({
+  tab,
+  activeTabId,
+  closeTab,
+  onClick,
+  isRenaming,
+  onRename,
+  onDoubleClick,
+}: {
+  tab: JsonTab;
+  activeTabId: string;
+  closeTab: (tabId: string, e: React.MouseEvent) => void;
+  onClick: () => void;
+  isRenaming: boolean;
+  onRename: (newName: string) => void;
+  onDoubleClick: () => void;
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: tab.id,
+    disabled: isRenaming, // Disable dragging while renaming
+  });
 
-  // Function to open a file dialog and read a JSON file
+  const [editName, setEditName] = useState(tab.name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Focus the input when entering edit mode
+  useEffect(() => {
+    if (isRenaming && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isRenaming]);
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 1 : 0,
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      onRename(editName);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setEditName(tab.name); // Reset to original name
+      onRename(tab.name);
+    }
+  };
+
+  const handleBlur = () => {
+    onRename(editName);
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`tab ${activeTabId === tab.id ? "active" : ""} ${
+        isDragging ? "dragging" : ""
+      }`}
+      onClick={onClick}
+      style={style}
+      {...(isRenaming ? {} : { ...attributes, ...listeners })}
+    >
+      {isRenaming ? (
+        <input
+          ref={inputRef}
+          className="tab-name-input"
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
+          onClick={(e) => e.stopPropagation()}
+          maxLength={30}
+        />
+      ) : (
+        <span className="tab-name" onDoubleClick={onDoubleClick}>
+          {tab.name}
+        </span>
+      )}
+
+      {/* Close button - exclude from drag listeners */}
+      <button className="close-tab" onClick={(e) => closeTab(tab.id, e)}>
+        ×
+      </button>
+    </div>
+  );
+};
+
+function App() {
+  // State for tabs and current active tab
+  const [tabs, setTabs] = useState<JsonTab[]>([
+    {
+      id: "tab-" + Date.now(),
+      name: "Untitled",
+      jsonInput: "",
+      parsedJson: null,
+      isEditing: true,
+      searchTerm: "",
+    },
+  ]);
+  const [activeTabId, setActiveTabId] = useState<string>(tabs[0].id);
+  const [renamingTabId, setRenamingTabId] = useState<string | null>(null);
+
+  // Get active tab data
+  const activeTab = tabs.find((tab) => tab.id === activeTabId) || tabs[0];
+
+  // Other state
+  const [error, setError] = useState<string>("");
+  const [showSearchBar, setShowSearchBar] = useState<boolean>(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // DnD sensors setup
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5, // 5px movement required before drag starts
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Function to add a new tab
+  const addNewTab = () => {
+    const newTab: JsonTab = {
+      id: "tab-" + Date.now(),
+      name: "Untitled",
+      jsonInput: "",
+      parsedJson: null,
+      isEditing: true,
+      searchTerm: "",
+    };
+    setTabs([...tabs, newTab]);
+    setActiveTabId(newTab.id);
+  };
+
+  // Function to close a tab
+  const closeTab = (tabId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent tab activation when closing
+
+    // Don't close the last tab
+    if (tabs.length === 1) return;
+
+    const newTabs = tabs.filter((tab) => tab.id !== tabId);
+    setTabs(newTabs);
+
+    // If we closed the active tab, activate another tab
+    if (tabId === activeTabId) {
+      setActiveTabId(newTabs[0].id);
+    }
+
+    // If we closed the tab being renamed, cancel renaming
+    if (tabId === renamingTabId) {
+      setRenamingTabId(null);
+    }
+  };
+
+  // Start tab rename
+  const startRenaming = (tabId: string) => {
+    setRenamingTabId(tabId);
+  };
+
+  // Complete tab rename
+  const completeRename = (tabId: string, newName: string) => {
+    setTabs(
+      tabs.map((tab) =>
+        tab.id === tabId ? { ...tab, name: newName.trim() || "Untitled" } : tab
+      )
+    );
+    setRenamingTabId(null);
+  };
+
+  // Handle drag end event from dnd-kit
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setTabs((tabs) => {
+        const oldIndex = tabs.findIndex((tab) => tab.id === active.id);
+        const newIndex = tabs.findIndex((tab) => tab.id === over.id);
+
+        return arrayMove(tabs, oldIndex, newIndex);
+      });
+    }
+  };
+
+  // Function to update tab data
+  const updateActiveTab = (updates: Partial<JsonTab>) => {
+    setTabs(
+      tabs.map((tab) => (tab.id === activeTabId ? { ...tab, ...updates } : tab))
+    );
+  };
+
+  // Add keyboard shortcut for search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check if in preview mode
+      if (!activeTab.isEditing && activeTab.parsedJson) {
+        // Listen for Cmd+F (Mac) or Ctrl+F (Windows/Linux)
+        if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+          e.preventDefault(); // Prevent browser's default search
+          setShowSearchBar((prevState) => !prevState); // Toggle search bar
+
+          // If we're showing the search bar, focus it after a short delay
+          if (!showSearchBar) {
+            setTimeout(() => {
+              searchInputRef.current?.focus();
+            }, 50);
+          }
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeTab.isEditing, activeTab.parsedJson, showSearchBar]);
+
+  // Effect to focus search input when search bar appears
+  useEffect(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [activeTab.searchTerm]);
+
+  // Function to open a JSON file
   const openJsonFile = async () => {
     try {
       // Open a selection dialog for JSON files
@@ -717,17 +1002,25 @@ function App() {
       if (selected) {
         // Read the file content
         const content = await readTextFile(selected as string);
-        setJsonInput(content);
 
-        // Parse JSON
+        // Get file name from path
+        const fileName =
+          (selected as string).split(/[/\\]/).pop() || "Untitled";
+
         try {
           const parsed = JSON.parse(content);
-          setParsedJson(parsed);
+
+          // Update active tab with new content
+          updateActiveTab({
+            name: fileName,
+            jsonInput: content,
+            parsedJson: parsed,
+            isEditing: false,
+          });
+
           setError("");
-          setShowInputView(false); // Hide input view when JSON is loaded
         } catch (parseError) {
           setError("Failed to parse JSON: " + (parseError as Error).message);
-          setParsedJson(null);
         }
       }
     } catch (fileError) {
@@ -738,38 +1031,75 @@ function App() {
   // Function to handle JSON input from textarea
   const handleJsonInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const input = e.target.value;
-    setJsonInput(input);
 
     if (input.trim() === "") {
-      setParsedJson(null);
+      updateActiveTab({
+        jsonInput: input,
+        parsedJson: null,
+      });
       setError("");
       return;
     }
 
     try {
       const parsed = JSON.parse(input);
-      setParsedJson(parsed);
+      updateActiveTab({
+        jsonInput: input,
+        parsedJson: parsed,
+      });
       setError("");
-      setShowInputView(false); // Hide input view when JSON is parsed
     } catch (parseError) {
+      updateActiveTab({
+        jsonInput: input,
+      });
       setError("Invalid JSON: " + (parseError as Error).message);
-      setParsedJson(null);
+    }
+  };
+
+  // Function to format JSON for display in the editor
+  const formatJson = () => {
+    if (activeTab.parsedJson) {
+      const formatted = JSON.stringify(activeTab.parsedJson, null, 2);
+      updateActiveTab({
+        jsonInput: formatted,
+      });
     }
   };
 
   // Function to handle search input
   const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
+    updateActiveTab({
+      searchTerm: e.target.value,
+    });
   };
 
-  // Toggle between JSON viewer and input view
+  // Toggle between JSON viewer and editor
   const toggleView = () => {
-    setShowInputView(!showInputView);
+    // When switching from edit to preview, only proceed if we have valid JSON
+    if (activeTab.isEditing && !activeTab.parsedJson) {
+      // Don't switch to view mode if no valid JSON
+      return;
+    }
+
+    // If switching to edit mode, ensure the JSON is formatted
+    if (!activeTab.isEditing) {
+      formatJson();
+    }
+
+    updateActiveTab({
+      isEditing: !activeTab.isEditing,
+    });
   };
 
-  // Function to load new JSON (clear current and show input)
+  // Function to load new JSON (clear current and show editor)
   const loadNewJson = () => {
-    setShowInputView(true);
+    updateActiveTab({
+      jsonInput: "",
+      parsedJson: null,
+      isEditing: true,
+      searchTerm: "",
+    });
+    setError("");
   };
 
   // Function to check if an object is a valid JSON object or array
@@ -781,65 +1111,146 @@ function App() {
 
   return (
     <div className="container">
-      <h1>JSON Lens</h1>
-
       <div className="card">
-        {/* Input View */}
-        {showInputView && (
-          <div className="input-view">
-            <div className="input-options">
-              <button onClick={openJsonFile} className="primary-button">
-                Open JSON File
-              </button>
-              <p>Or paste JSON below:</p>
+        {/* Tab bar with drag-and-drop functionality - always visible */}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="tabs-container">
+            <SortableContext
+              items={tabs.map((tab) => tab.id)}
+              strategy={horizontalListSortingStrategy}
+            >
+              {tabs.map((tab) => (
+                <SortableTab
+                  key={tab.id}
+                  tab={tab}
+                  activeTabId={activeTabId}
+                  closeTab={closeTab}
+                  onClick={() => setActiveTabId(tab.id)}
+                  isRenaming={renamingTabId === tab.id}
+                  onRename={(newName) => completeRename(tab.id, newName)}
+                  onDoubleClick={() => startRenaming(tab.id)}
+                />
+              ))}
+            </SortableContext>
+
+            <button className="new-tab-button" onClick={addNewTab}>
+              +
+            </button>
+          </div>
+        </DndContext>
+
+        {/* Action buttons that always show */}
+        <div className="json-viewer-header">
+          <div className="json-viewer-actions">
+            <div className="action-buttons">
+              {activeTab.isEditing && (
+                <>
+                  <button onClick={openJsonFile} className="open-file-button">
+                    Open JSON File
+                  </button>
+                  <button onClick={loadNewJson} className="secondary-button">
+                    New JSON
+                  </button>
+                </>
+              )}
+              {/* Only show Preview button when in edit mode and valid JSON exists */}
+              {activeTab.isEditing && activeTab.parsedJson && (
+                <button onClick={toggleView} className="secondary-button">
+                  Preview
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Content area */}
+        <div className="content-area">
+          {/* Editor View */}
+          {activeTab.isEditing ? (
+            <div className="input-view">
               <textarea
                 className="json-input"
-                value={jsonInput}
+                value={activeTab.jsonInput}
                 onChange={handleJsonInput}
                 placeholder="Paste your JSON here..."
-                rows={5}
+                style={{ flex: 1, height: "100%" }}
               />
+              {error && <div className="error-message">{error}</div>}
             </div>
-
-            {error && <div className="error-message">{error}</div>}
-          </div>
-        )}
-
-        {/* JSON Viewer */}
-        {parsedJson && isValidJsonObject(parsedJson) && (
-          <div
-            className={`json-viewer-container ${
-              !showInputView ? "fullscreen" : ""
-            }`}
-          >
-            <div className="json-viewer-header">
-              <div className="json-viewer-actions">
-                <div className="search-container">
-                  <input
-                    type="text"
-                    className="search-input"
-                    placeholder="Search in JSON..."
-                    value={searchTerm}
-                    onChange={handleSearchInput}
+          ) : (
+            /* JSON Viewer */
+            activeTab.parsedJson &&
+            isValidJsonObject(activeTab.parsedJson) && (
+              <div className="json-viewer-container">
+                {/* Togglable search bar */}
+                {showSearchBar && (
+                  <div
+                    style={{
+                      padding: "10px",
+                      display: "flex",
+                      gap: "10px",
+                      marginBottom: "10px",
+                      background: "#333",
+                      borderRadius: "4px",
+                      animation: "fadeIn 0.2s ease-in-out",
+                    }}
+                  >
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      placeholder="Search in JSON..."
+                      className="search-input"
+                      value={activeTab.searchTerm}
+                      onChange={handleSearchInput}
+                      style={{
+                        flex: 1,
+                        padding: "8px",
+                        borderRadius: "4px",
+                        border: "1px solid #444",
+                        background: "#1a1a1a",
+                        color: "#fff",
+                      }}
+                    />
+                    <button
+                      onClick={() => updateActiveTab({ searchTerm: "" })}
+                      style={{
+                        padding: "8px",
+                        borderRadius: "4px",
+                        border: "1px solid #f1fa8c",
+                        background: "transparent",
+                        color: "#f1fa8c",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+                <div className="json-container">
+                  <CollapsibleJSON
+                    data={activeTab.parsedJson}
+                    searchTerm={activeTab.searchTerm}
+                    onSwitchToEdit={toggleView}
+                    onToggleSearch={() => {
+                      setShowSearchBar(!showSearchBar);
+                      // Focus the search input when it appears
+                      if (!showSearchBar) {
+                        setTimeout(() => {
+                          searchInputRef.current?.focus();
+                        }, 50);
+                      }
+                    }}
+                    showSearchBar={showSearchBar}
                   />
                 </div>
-                <div className="action-buttons">
-                  {!showInputView && (
-                    <button onClick={loadNewJson} className="secondary-button">
-                      Load New JSON
-                    </button>
-                  )}
-                  <button onClick={toggleView} className="secondary-button">
-                    {showInputView ? "Hide Input" : "Show Input"}
-                  </button>
-                </div>
               </div>
-            </div>
-            <div className="json-container">
-              <CollapsibleJSON data={parsedJson} searchTerm={searchTerm} />
-            </div>
-          </div>
-        )}
+            )
+          )}
+        </div>
       </div>
     </div>
   );

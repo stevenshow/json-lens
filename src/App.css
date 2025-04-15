@@ -63,6 +63,7 @@ body {
   flex-direction: column;
   flex: 1;
   overflow: hidden;
+  max-height: calc(100vh - 1rem); /* Adjusted: removed header height */
 }
 
 .primary-button {
@@ -93,10 +94,12 @@ body {
   text-align: left;
   padding: 0.5rem;
   border-radius: 8px;
+  border: 1px solid #444;
   background-color: #1a1a1a;
   flex: 1;
   width: 100%;
   overflow: auto;
+  height: 100%;
 }
 
 .json-display {
@@ -312,6 +315,9 @@ h1 {
   font-family: monospace;
   resize: vertical;
   box-sizing: border-box;
+  flex: 1;
+  display: block;
+  overflow: auto;
 }
 
 .json-input:focus {
@@ -332,6 +338,7 @@ h1 {
   }
   .json-container {
     background-color: #f0f0f0;
+    border-color: #ddd;
   }
   .json-input {
     background-color: #f9f9f9;
@@ -369,6 +376,29 @@ h1 {
   margin-bottom: 0.5rem;
   width: 100%;
   box-sizing: border-box;
+  transition: all 0.3s ease;
+  animation: slideDown 0.3s ease;
+  overflow: hidden;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .search-input {
@@ -429,18 +459,30 @@ h1 {
   flex-direction: column;
   flex: 1;
   overflow: hidden;
+  max-height: 100%;
 }
 
+/* Remove the fullscreen class completely to ensure it's not applied */
 .json-viewer-container.fullscreen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 100;
-  background-color: #242424;
-  padding: 0.5rem;
-  height: 100vh;
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  z-index: auto;
+  background-color: transparent;
+  padding: 0;
+  height: auto;
+}
+
+/* New content area styling */
+.content-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  height: calc(100% - 90px); /* Adjusted: account for removed header */
 }
 
 .json-viewer-header {
@@ -468,17 +510,20 @@ h1 {
 
 .secondary-button {
   background-color: transparent;
-  border: 1px solid #646cff;
-  color: #646cff;
+  border: 1px solid #f8f8f2; /* Light color */
+  color: #f8f8f2;
   padding: 0.4em 0.8em;
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.9em;
   transition: all 0.2s ease;
+  height: auto;
+  display: inline-flex;
+  align-items: center;
 }
 
 .secondary-button:hover {
-  background-color: rgba(100, 108, 255, 0.1);
+  background-color: rgba(248, 248, 242, 0.1);
 }
 
 .input-view {
@@ -487,6 +532,7 @@ h1 {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 @media (prefers-color-scheme: light) {
@@ -516,13 +562,6 @@ h1 {
   .action-buttons {
     width: auto;
     align-items: center;
-  }
-  
-  .secondary-button {
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 }
 
@@ -730,5 +769,303 @@ h1 {
 
   .top-button:hover {
     background-color: rgba(200, 200, 200, 0.9);
+  }
+}
+
+.edit-button {
+  background-color: transparent;
+  border: 1px solid #8be9fd;
+  color: #8be9fd;
+  padding: 0.4em 0.8em;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: all 0.2s ease;
+}
+
+.edit-button:hover {
+  background-color: rgba(139, 233, 253, 0.1);
+}
+
+.open-file-button {
+  background-color: transparent;
+  border: 1px solid #bd93f9; /* Purple color */
+  color: #bd93f9;
+  padding: 0.4em 0.8em;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: all 0.2s ease;
+}
+
+.open-file-button:hover {
+  background-color: rgba(189, 147, 249, 0.1);
+}
+
+@media (prefers-color-scheme: light) {
+  .edit-button {
+    border: 1px solid #0070c9;
+    color: #0070c9;
+  }
+  
+  .edit-button:hover {
+    background-color: rgba(0, 112, 201, 0.1);
+  }
+  
+  .open-file-button {
+    border: 1px solid #6b26b0; /* Purple for light mode */
+    color: #6b26b0;
+  }
+  
+  .open-file-button:hover {
+    background-color: rgba(107, 38, 176, 0.1);
+  }
+  
+  .secondary-button {
+    border: 1px solid #213547;
+    color: #213547;
+  }
+  
+  .secondary-button:hover {
+    background-color: rgba(33, 53, 71, 0.1);
+  }
+}
+
+.search-button {
+  background-color: transparent;
+  border: 1px solid #f1fa8c; /* Yellow color */
+  color: #f1fa8c;
+  padding: 0.4em 0.8em;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: all 0.2s ease;
+}
+
+.search-button:hover {
+  background-color: rgba(241, 250, 140, 0.1);
+}
+
+@media (prefers-color-scheme: light) {
+  .secondary-button:hover {
+    background-color: rgba(33, 53, 71, 0.1);
+  }
+  
+  .search-button {
+    border: 1px solid #8f5a0c; /* Amber for light mode */
+    color: #8f5a0c;
+  }
+  
+  .search-button:hover {
+    background-color: rgba(143, 90, 12, 0.1);
+  }
+}
+
+/* Tab styles */
+.tabs-container {
+  display: flex;
+  border-bottom: 1px solid #444;
+  margin-bottom: 8px;
+  overflow-x: auto;
+  overflow-y: hidden; /* Explicitly prevent vertical scrolling */
+  min-height: 32px; /* Reduced height */
+  max-height: 32px; /* Fixed height to prevent vertical expansion */
+  scrollbar-width: thin;
+  scrollbar-color: #444 #242424;
+}
+
+.tabs-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tabs-container::-webkit-scrollbar-track {
+  background: #242424;
+}
+
+.tabs-container::-webkit-scrollbar-thumb {
+  background-color: #444;
+  border-radius: 3px;
+}
+
+.tab {
+  padding: 4px 12px; /* Reduced padding */
+  margin-right: 2px;
+  cursor: pointer;
+  background-color: transparent;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  min-width: 100px; /* Reduced min-width */
+  justify-content: space-between;
+  user-select: none; /* Prevent text selection during drag */
+  transition: background-color 0.2s ease;
+  font-size: 0.9em; /* Slightly smaller text */
+}
+
+.tab.active {
+  background-color: #333;
+  border-top: 1px solid #444;
+  border-left: 1px solid #444;
+  border-right: 1px solid #444;
+  position: relative;
+}
+
+.tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: #333; /* Covers the border-bottom */
+}
+
+.tab:hover:not(.active) {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.tab.drag-over {
+  border-left: 2px solid #8be9fd;
+}
+
+.tab.dragging {
+  opacity: 0.8;
+  background-color: #444;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+}
+
+.tab-name {
+  max-width: 90px; /* Slightly smaller */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: text;
+  opacity: 0.9;
+}
+
+.tab.active .tab-name {
+  opacity: 1;
+}
+
+.tab-name-input {
+  background-color: transparent;
+  border: none;
+  border-bottom: 1px solid #8be9fd;
+  color: inherit;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0;
+  margin: 0;
+  width: 90px;
+  outline: none;
+  max-width: 90px;
+}
+
+.tab-name-input:focus {
+  border-bottom-color: #646cff;
+}
+
+.close-tab {
+  margin-left: 4px; /* Reduced margin */
+  background: transparent;
+  border: none;
+  color: #666; /* Lighter color by default */
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: bold;
+  opacity: 0.6;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.tab:hover .close-tab, .tab.active .close-tab {
+  opacity: 1;
+  color: #888;
+}
+
+.close-tab:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.new-tab-button {
+  padding: 4px 8px; /* Reduced padding */
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #666;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.new-tab-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+@media (prefers-color-scheme: light) {
+  .tabs-container {
+    border-bottom: 1px solid #ccc;
+    scrollbar-color: #ccc #f0f0f0;
+  }
+  
+  .tabs-container::-webkit-scrollbar-track {
+    background: #f0f0f0;
+  }
+  
+  .tabs-container::-webkit-scrollbar-thumb {
+    background-color: #ccc;
+  }
+  
+  .tab {
+    border-color: #ddd;
+  }
+  
+  .tab.active {
+    background-color: #f5f5f5;
+    border-top: 1px solid #ddd;
+    border-left: 1px solid #ddd;
+    border-right: 1px solid #ddd;
+  }
+  
+  .tab.active::after {
+    background-color: #f5f5f5;
+  }
+  
+  .tab:hover:not(.active) {
+    background-color: rgba(0, 0, 0, 0.03);
+  }
+  
+  .tab.drag-over {
+    border-left: 2px solid #0070c9;
+  }
+  
+  .close-tab {
+    color: #999;
+  }
+  
+  .tab:hover .close-tab, .tab.active .close-tab {
+    color: #666;
+  }
+  
+  .close-tab:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: #333;
+  }
+  
+  .new-tab-button {
+    color: #999;
+  }
+  
+  .new-tab-button:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: #333;
   }
 }
